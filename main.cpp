@@ -1,19 +1,24 @@
 #include <QCoreApplication>
+#include <QCommandLineParser>
+#include "httpserver.h"
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
+    app.setApplicationName("KrtkServer");
 
-    // Set up code that uses the Qt event loop here.
-    // Call app.quit() or app.exit() to quit the application.
-    // A not very useful example would be including
-    // #include <QTimer>
-    // near the top of the file and calling
-    // QTimer::singleShot(5000, &a, &QCoreApplication::quit);
-    // which quits the application after 5 seconds.
+    QCommandLineParser parser;
+    parser.addHelpOption();
+    parser.addOption({{"p", "port"}, "Port to listen on (default: 8080)", "port", "8080"});
+    parser.addOption({{"f", "file"}, "File to store GPS points (default: gps_points.csv)", "file", "gps_points.csv"});
+    parser.process(app);
 
-    // If you do not need a running Qt event loop, remove the call
-    // to app.exec() or use the Non-Qt Plain C++ Application template.
+    quint16 port = static_cast<quint16>(parser.value("port").toUShort());
+    QString storagePath = parser.value("file");
+
+    HttpServer server(storagePath, port);
+    if (!server.start())
+        return 1;
 
     return app.exec();
 }
