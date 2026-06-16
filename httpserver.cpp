@@ -25,17 +25,40 @@ bool HttpServer::start() {
 void HttpServer::onNewConnection() {
   while (m_server.hasPendingConnections()) {
     QTcpSocket *socket = m_server.nextPendingConnection();
-    // Read entire request before handling (buffer until headers + body
-    // complete)
-    connect(socket, &QTcpSocket::readyRead, this,
-            [this, socket]() { handleClient(socket); });
-    connect(socket, &QTcpSocket::disconnected, socket,
-            &QTcpSocket::deleteLater);
+    connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
+      m_buffers[socket] += socket->readAll();
+      QByteArray &buf = m_buffers[socket];
+
+      int headerEnd = buf.indexOf("\r\n\r\n");
+      if (headerEnd < 0)
+        return; // headers not yet complete
+
+      // Extract Content-Length
+      int contentLength = 0;
+      QByteArray headers = buf.left(headerEnd);
+      for (const QByteArray &line : headers.split('\n')) {
+        QByteArray lower = line.trimmed().toLower();
+        if (lower.startsWith("content-length:")) {
+          contentLength = lower.mid(15).trimmed().toInt();
+          break;
+        }
+      }
+
+      int bodyReceived = buf.size() - (headerEnd + 4);
+      if (bodyReceived < contentLength)
+        return; // body not yet complete
+
+      handleClient(socket, buf);
+      m_buffers.remove(socket);
+    });
+    connect(socket, &QTcpSocket::disconnected, this, [this, socket]() {
+      m_buffers.remove(socket);
+      socket->deleteLater();
+    });
   }
 }
 
-void HttpServer::handleClient(QTcpSocket *socket) {
-  QByteArray data = socket->readAll();
+void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
 
   // Parse request line
   int lineEnd = data.indexOf("\r\n");

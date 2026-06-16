@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QGeoPath>
+#include <QMap>
 #include <QObject>
 #include <QString>
 #include <QTcpServer>
@@ -22,8 +23,9 @@ private:
   QString m_storagePath;
   quint16 m_port;
   QGeoPath m_path;
+  QMap<QTcpSocket *, QByteArray> m_buffers;
 
-  void handleClient(QTcpSocket *socket);
+  void handleClient(QTcpSocket *socket, const QByteArray &data);
   QByteArray buildResponse(int status, const QByteArray &body);
   bool appendGpsPoints(const QByteArray &csvData, QString &error);
 };
