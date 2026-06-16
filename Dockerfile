@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     qt6-base-dev \
+    qt6-positioning-dev \
+    libqt6sql6-sqlite \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
