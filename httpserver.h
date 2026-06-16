@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QGeoPath>
 #include <QObject>
 #include <QString>
 #include <QTcpServer>
@@ -11,6 +12,8 @@ public:
                       QObject *parent = nullptr);
   bool start();
 
+  const QGeoPath &path() const { return m_path; }
+
 private slots:
   void onNewConnection();
 
@@ -18,6 +21,7 @@ private:
   QTcpServer m_server;
   QString m_storagePath;
   quint16 m_port;
+  QGeoPath m_path;
 
   void handleClient(QTcpSocket *socket);
   QByteArray buildResponse(int status, const QByteArray &body);

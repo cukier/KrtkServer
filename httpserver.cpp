@@ -2,8 +2,8 @@
 
 #include <QDebug>
 #include <QFile>
+#include <QGeoCoordinate>
 #include <QTcpSocket>
-#include <QTextStream>
 
 HttpServer::HttpServer(const QString &storagePath, quint16 port,
                        QObject *parent)
@@ -50,7 +50,24 @@ void HttpServer::handleClient(QTcpSocket *socket) {
   }
 
   QByteArray method = parts[0];
-  QByteArray path = parts[1];
+  QByteArray rawPath = parts[1];
+
+  // Split path and query string
+  QByteArray path = rawPath;
+  QByteArray queryString;
+  int qmark = rawPath.indexOf('?');
+  if (qmark >= 0) {
+    path = rawPath.left(qmark);
+    queryString = rawPath.mid(qmark + 1);
+  }
+
+  // Parse query params into a simple map
+  QMap<QByteArray, QByteArray> params;
+  for (const QByteArray &kv : queryString.split('&')) {
+    int eq = kv.indexOf('=');
+    if (eq > 0)
+      params[kv.left(eq)] = kv.mid(eq + 1);
+  }
 
   // Separate headers from body
   int headerEnd = data.indexOf("\r\n\r\n");
@@ -62,6 +79,52 @@ void HttpServer::handleClient(QTcpSocket *socket) {
 
   if (method == "GET" && path == "/ping") {
     response = buildResponse(200, "{\"status\":\"pong\"}");
+
+  } else if (method == "GET" && path == "/download") {
+    if (!params.contains("page")) {
+      response = buildResponse(400, "{\"error\":\"missing page parameter\"}\n");
+    } else {
+      bool pageOk = false, sizeOk = false;
+      int page = params["page"].toInt(&pageOk);
+      int size = params.contains("size") ? params["size"].toInt(&sizeOk) : 1000;
+      if (!params.contains("size"))
+        sizeOk = true;
+
+      if (!pageOk || !sizeOk || page < 1 || size < 1) {
+        response = buildResponse(400, "{\"error\":\"invalid page or size\"}\n");
+      } else {
+        const QList<QGeoCoordinate> &coords = m_path.path();
+        int total = coords.size();
+        int offset = (page - 1) * size;
+
+        QByteArray json = "{\"page\":" + QByteArray::number(page) +
+                          ",\"size\":" + QByteArray::number(size) +
+                          ",\"total\":" + QByteArray::number(total);
+
+        if (offset >= total && total > 0) {
+          json += ",\"count\":0,\"coordinates\":[]}\n";
+        } else {
+          int end = qMin(offset + size, total);
+          int count = qMax(0, end - offset);
+          json += ",\"count\":" + QByteArray::number(count) +
+                  ",\"coordinates\":[";
+          for (int i = offset; i < end; ++i) {
+            const QGeoCoordinate &c = coords[i];
+            if (i > offset)
+              json += ",";
+            json += "{\"lat\":" +
+                    QByteArray::number(c.latitude(), 'f', 7) +
+                    ",\"lon\":" +
+                    QByteArray::number(c.longitude(), 'f', 7);
+            if (c.type() == QGeoCoordinate::Coordinate3D)
+              json += ",\"alt\":" + QByteArray::number(c.altitude(), 'f', 2);
+            json += "}";
+          }
+          json += "]}\n";
+        }
+        response = buildResponse(200, json);
+      }
+    }
 
   } else if (method == "POST" && path == "/upload") {
     if (body.isEmpty()) {
@@ -108,12 +171,11 @@ QByteArray HttpServer::buildResponse(int status, const QByteArray &body) {
 // skipped
 bool HttpServer::appendGpsPoints(const QByteArray &csvData, QString &error) {
   QFile file(m_storagePath);
-  if (!file.open(QIODevice::Append | QIODevice::Text)) {
+  if (!file.open(QIODevice::Append)) {
     error = "Cannot open storage file: " + file.errorString();
     return false;
   }
 
-  QTextStream out(&file);
   int written = 0;
 
   for (const QByteArray &rawLine : csvData.split('\n')) {
@@ -126,22 +188,31 @@ bool HttpServer::appendGpsPoints(const QByteArray &csvData, QString &error) {
       continue;
 
     bool latOk = false, lonOk = false;
-    double lat = fields[0].trimmed().toDouble(&latOk);
-    double lon = fields[1].trimmed().toDouble(&lonOk);
+    double lat = fields[0].toDouble(&latOk);
+    double lon = fields[1].toDouble(&lonOk);
 
     if (!latOk || !lonOk)
-      continue; // header or bad row
+      continue;
 
     if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
       error = QString("Coordinates out of range: %1,%2").arg(lat).arg(lon);
       return false;
     }
 
+    QGeoCoordinate coord(lat, lon);
+    if (fields.size() >= 3) {
+      bool altOk = false;
+      double alt = fields[2].trimmed().toDouble(&altOk);
+      if (altOk)
+        coord.setAltitude(alt);
+    }
+    m_path.addCoordinate(coord);
+
+    QByteArray row = fields[0].trimmed() + "," + fields[1].trimmed();
     if (fields.size() >= 3)
-      out << fields[0].trimmed() << "," << fields[1].trimmed() << ","
-          << fields[2].trimmed() << "\n";
-    else
-      out << fields[0].trimmed() << "," << fields[1].trimmed() << "\n";
+      row += "," + fields[2].trimmed();
+    row += "\n";
+    file.write(row);
 
     ++written;
   }
