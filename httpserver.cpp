@@ -482,9 +482,6 @@ L.Control.geocoder({defaultMarkGeocode: false, placeholder: 'Search place…'})
   .on('markgeocode', e => { map.fitBounds(e.geocode.bbox, {padding:[24,24]}); })
   .addTo(map);
 
-map.locate({setView: true, maxZoom: 16});
-map.on('locationerror', () => map.setView([0, 0], 2));
-
 let drawing = false;
 let points = [];
 let polyline = L.polyline([], {color:'#58a6ff',weight:3}).addTo(map);
