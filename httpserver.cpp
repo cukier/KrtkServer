@@ -15,6 +15,7 @@ HttpServer::HttpServer(const QString &storagePath, quint16 port,
 }
 
 bool HttpServer::start() {
+  loadFromFile();
   if (!m_server.listen(QHostAddress::Any, m_port)) {
     qCritical() << "Failed to start server:" << m_server.errorString();
     return false;
@@ -22,6 +23,48 @@ bool HttpServer::start() {
   qInfo() << "HTTP server listening on port" << m_port;
   qInfo() << "GPS data stored at:" << m_storagePath;
   return true;
+}
+
+void HttpServer::loadFromFile() {
+  QFile file(m_storagePath);
+  if (!file.exists())
+    return;
+  if (!file.open(QIODevice::ReadOnly)) {
+    qWarning() << "Could not open storage file for reading:" << file.errorString();
+    return;
+  }
+
+  int loaded = 0;
+  while (!file.atEnd()) {
+    QByteArray line = file.readLine().trimmed();
+    if (line.isEmpty())
+      continue;
+
+    QList<QByteArray> fields = line.split(',');
+    if (fields.size() < 2)
+      continue;
+
+    bool latOk = false, lonOk = false;
+    double lat = fields[0].toDouble(&latOk);
+    double lon = fields[1].toDouble(&lonOk);
+
+    if (!latOk || !lonOk)
+      continue;
+    if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0)
+      continue;
+
+    QGeoCoordinate coord(lat, lon);
+    if (fields.size() >= 3) {
+      bool altOk = false;
+      double alt = fields[2].trimmed().toDouble(&altOk);
+      if (altOk)
+        coord.setAltitude(alt);
+    }
+    m_path.addCoordinate(coord);
+    ++loaded;
+  }
+
+  qInfo() << "Loaded" << loaded << "GPS points from" << m_storagePath;
 }
 
 void HttpServer::onNewConnection() {

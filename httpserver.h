@@ -28,4 +28,5 @@ private:
   void handleClient(QTcpSocket *socket, const QByteArray &data);
   QByteArray buildResponse(int status, const QByteArray &body);
   bool appendGpsPoints(const QByteArray &csvData, QString &error);
+  void loadFromFile();
 };
