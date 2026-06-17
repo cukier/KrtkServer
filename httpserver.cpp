@@ -177,72 +177,97 @@ void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
   QByteArray response;
 
   if (method == "GET" && path == "/help") {
-    static const QByteArray help =
-        "{"
-        "\"endpoints\":["
-          "{"
-            "\"method\":\"GET\","
-            "\"path\":\"/ping\","
-            "\"description\":\"Health check\","
-            "\"params\":[]"
-          "},"
-          "{"
-            "\"method\":\"GET\","
-            "\"path\":\"/files\","
-            "\"description\":\"List all GPS files in the storage directory\","
-            "\"params\":[]"
-          "},"
-          "{"
-            "\"method\":\"GET\","
-            "\"path\":\"/download\","
-            "\"description\":\"Return the full path as a JSON array\","
-            "\"params\":["
-              "{\"name\":\"file\",\"required\":false,\"description\":\"File to read from; defaults to current file\"}"
-            "]"
-          "},"
-          "{"
-            "\"method\":\"GET\","
-            "\"path\":\"/path\","
-            "\"description\":\"Return paginated coordinates\","
-            "\"params\":["
-              "{\"name\":\"page\",\"required\":true,\"description\":\"Page number (1-based)\"},"
-              "{\"name\":\"size\",\"required\":false,\"description\":\"Page size (default 1000)\"},"
-              "{\"name\":\"file\",\"required\":false,\"description\":\"File to read from; defaults to current file\"}"
-            "]"
-          "},"
-          "{"
-            "\"method\":\"POST\","
-            "\"path\":\"/upload\","
-            "\"description\":\"Append GPS points from a CSV body (lat,lon[,alt] per line); sets the current file\","
-            "\"params\":["
-              "{\"name\":\"file\",\"required\":false,\"description\":\"File to append to; defaults to current file\"}"
-            "]"
-          "},"
-          "{"
-            "\"method\":\"POST\","
-            "\"path\":\"/save\","
-            "\"description\":\"Overwrite a file with the current in-memory path\","
-            "\"params\":["
-              "{\"name\":\"file\",\"required\":false,\"description\":\"File to write to; defaults to current file\"}"
-            "]"
-          "},"
-          "{"
-            "\"method\":\"DELETE\","
-            "\"path\":\"/delete\","
-            "\"description\":\"Delete a GPS file from the storage directory\","
-            "\"params\":["
-              "{\"name\":\"file\",\"required\":false,\"description\":\"File to delete; defaults to current file\"}"
-            "]"
-          "},"
-          "{"
-            "\"method\":\"GET\","
-            "\"path\":\"/help\","
-            "\"description\":\"This API map\","
-            "\"params\":[]"
-          "}"
-        "]"
-        "}";
-    response = buildResponse(200, help);
+    static const QByteArray help = R"html(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrtkServer API</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;padding:2rem;max-width:780px;margin:0 auto}
+h1{font-size:1.35rem;font-weight:600;color:#f0f6fc;margin-bottom:.3rem}
+.sub{color:#8b949e;font-size:.82rem;margin-bottom:2rem}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:.75rem;overflow:hidden}
+.row{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem}
+.badge{font-size:.68rem;font-weight:700;padding:.18rem .45rem;border-radius:4px;letter-spacing:.07em;min-width:54px;text-align:center}
+.GET{background:#0d2b1a;color:#3fb950}
+.POST{background:#0c1f3f;color:#58a6ff}
+.DELETE{background:#2d0f0f;color:#f85149}
+.path{font-family:'SF Mono',Consolas,monospace;font-size:.92rem;font-weight:500;color:#f0f6fc}
+.desc{color:#8b949e;font-size:.8rem;margin-left:auto;text-align:right}
+.params{border-top:1px solid #21262d;padding:.65rem 1rem}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{color:#6e7681;font-weight:500;text-align:left;padding:.15rem .5rem .35rem}
+td{padding:.28rem .5rem;color:#c9d1d9;vertical-align:top}
+td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-space:nowrap}
+.req{color:#f85149;font-size:.67rem;font-weight:600;background:#2d0f0f;padding:.1rem .3rem;border-radius:3px}
+.opt{color:#6e7681;font-size:.67rem}
+.note{color:#6e7681;padding-top:.4rem;font-style:italic}
+</style>
+</head>
+<body>
+<h1>KrtkServer API</h1>
+<p class="sub">GPS track server &mdash; responses are JSON unless noted &bull; <code>file</code> param defaults to the current active file</p>
+
+<div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/ping</span><span class="desc">Health check</span></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/files</span><span class="desc">List all GPS files in storage</span></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/download</span><span class="desc">Full path as JSON array</span></div>
+  <div class="params"><table>
+    <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to read from</td></tr>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/path</span><span class="desc">Paginated coordinates</span></div>
+  <div class="params"><table>
+    <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>page</td><td><span class="req">required</span></td><td>Page number (1-based)</td></tr>
+    <tr><td>size</td><td><span class="opt">optional</span></td><td>Page size (default 1000)</td></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to read from</td></tr>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge POST">POST</span><span class="path">/upload</span><span class="desc">Append CSV body; sets active file</span></div>
+  <div class="params"><table>
+    <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to append to</td></tr>
+    <tr><td colspan="3" class="note">Body: one <code>lat,lon[,alt]</code> per line &mdash; non-numeric header rows are skipped</td></tr>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge POST">POST</span><span class="path">/save</span><span class="desc">Overwrite file with in-memory path</span></div>
+  <div class="params"><table>
+    <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to write to</td></tr>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge DELETE">DELETE</span><span class="path">/delete</span><span class="desc">Delete a GPS file</span></div>
+  <div class="params"><table>
+    <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to delete</td></tr>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/help</span><span class="desc">This page</span></div>
+</div>
+
+</body>
+</html>)html";
+    response = buildResponse(200, help, "text/html");
 
   } else if (method == "GET" && path == "/ping") {
     response = buildResponse(200, "{\"status\":\"pong\"}");
@@ -388,21 +413,17 @@ void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
   socket->disconnectFromHost();
 }
 
-QByteArray HttpServer::buildResponse(int status, const QByteArray &body) {
+QByteArray HttpServer::buildResponse(int status, const QByteArray &body,
+                                      const QByteArray &contentType) {
   QByteArray statusText = (status == 200)   ? "OK"
                           : (status == 400) ? "Bad Request"
                           : (status == 404) ? "Not Found"
                                             : "Internal Server Error";
 
   return "HTTP/1.1 " + QByteArray::number(status) + " " + statusText +
-         "\r\n"
-         "Content-Type: application/json\r\n"
-         "Content-Length: " +
-         QByteArray::number(body.size()) +
-         "\r\n"
-         "Connection: close\r\n"
-         "\r\n" +
-         body;
+         "\r\nContent-Type: " + contentType +
+         "\r\nContent-Length: " + QByteArray::number(body.size()) +
+         "\r\nConnection: close\r\n\r\n" + body;
 }
 
 // Expected CSV: latitude,longitude[,altitude] — header rows (non-numeric) are skipped

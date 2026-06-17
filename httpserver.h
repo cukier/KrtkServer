@@ -27,7 +27,8 @@ private:
   QMap<QTcpSocket *, QByteArray> m_buffers;
 
   void handleClient(QTcpSocket *socket, const QByteArray &data);
-  QByteArray buildResponse(int status, const QByteArray &body);
+  QByteArray buildResponse(int status, const QByteArray &body,
+                           const QByteArray &contentType = "application/json");
   bool appendGpsPoints(const QByteArray &csvData, const QString &filePath, QString &error);
   bool saveToFile(const QString &filePath, QString &error) const;
   QList<QGeoCoordinate> readCoordinates(const QString &filePath, QString &error) const;
