@@ -10,14 +10,14 @@ int main(int argc, char *argv[]) {
   parser.addHelpOption();
   parser.addOption(
       {{"p", "port"}, "Port to listen on (default: 8080)", "port", "8080"});
-  parser.addOption({{"f", "file"},
-                    "File to store GPS points (default: gps_points.csv)",
-                    "file",
-                    "gps_points.csv"});
+  parser.addOption({{"d", "dir"},
+                    "Directory to store GPS files (default: gps_data)",
+                    "dir",
+                    "gps_data"});
   parser.process(app);
 
   quint16 port = static_cast<quint16>(parser.value("port").toUShort());
-  QString storagePath = parser.value("file");
+  QString storagePath = parser.value("dir");
 
   HttpServer server(storagePath, port);
   if (!server.start())
