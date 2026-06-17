@@ -221,10 +221,10 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
 </div>
 
 <div class="card">
-  <div class="row"><span class="badge GET">GET</span><span class="path">/download</span><span class="desc">Full path as JSON array</span></div>
+  <div class="row"><span class="badge GET">GET</span><span class="path">/download</span><span class="desc">List files (no param) or return full path as JSON</span></div>
   <div class="params"><table>
     <tr><th>param</th><th></th><th>description</th></tr>
-    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to read from</td></tr>
+    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to read — omit to list all saved filenames</td></tr>
   </table></div>
 </div>
 
@@ -232,9 +232,9 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
   <div class="row"><span class="badge GET">GET</span><span class="path">/path</span><span class="desc">Paginated coordinates</span></div>
   <div class="params"><table>
     <tr><th>param</th><th></th><th>description</th></tr>
+    <tr><td>file</td><td><span class="req">required</span></td><td>File to read from</td></tr>
     <tr><td>page</td><td><span class="req">required</span></td><td>Page number (1-based)</td></tr>
     <tr><td>size</td><td><span class="opt">optional</span></td><td>Page size (default 1000)</td></tr>
-    <tr><td>file</td><td><span class="opt">optional</span></td><td>File to read from</td></tr>
   </table></div>
 </div>
 
@@ -300,7 +300,17 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
     response = buildResponse(200, json);
 
   } else if (method == "GET" && path == "/download") {
-    // Full path JSON (swapped: was /path)
+    if (!params.contains("file")) {
+      QDir dir(m_storagePath);
+      QStringList files = dir.entryList(QDir::Files, QDir::Name);
+      QByteArray json = "{\"files\":[";
+      for (int i = 0; i < files.size(); ++i) {
+        if (i > 0) json += ",";
+        json += "\"" + files[i].toUtf8() + "\"";
+      }
+      json += "]}";
+      response = buildResponse(200, json);
+    } else {
     QString err;
     QList<QGeoCoordinate> coords = getCoords(err);
     if (!err.isEmpty()) {
@@ -322,10 +332,13 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
       json += "]}";
       response = buildResponse(200, json);
     }
+    }
 
   } else if (method == "GET" && path == "/path") {
     // Paginated (swapped: was /download)
-    if (!params.contains("page")) {
+    if (!params.contains("file")) {
+      response = buildResponse(400, "{\"error\":\"missing file parameter\"}\n");
+    } else if (!params.contains("page")) {
       response = buildResponse(400, "{\"error\":\"missing page parameter\"}\n");
     } else {
       bool pageOk = false, sizeOk = false;
