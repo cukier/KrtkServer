@@ -636,6 +636,17 @@ function fmtDist(m) {
   return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m';
 }
 
+function pathLength(latlngs) {
+  let total = 0;
+  for (let i = 1; i < latlngs.length; i++)
+    total += L.latLng(latlngs[i-1]).distanceTo(L.latLng(latlngs[i]));
+  return total;
+}
+
+function fmtDist(m) {
+  return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m';
+}
+
 async function loadFile(name) {
   clearLoaded();
   filePanel.classList.remove('open');
