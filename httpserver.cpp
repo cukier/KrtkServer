@@ -530,11 +530,17 @@ function updateCount() {
 
 let pressing = false;
 
+function metersPerPixel() {
+  const z = map.getZoom();
+  const lat = map.getCenter().lat;
+  return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+}
+
 function addPoint(latlng) {
   const {lat, lng} = latlng;
   if (points.length > 0) {
     const last = L.latLng(points[points.length - 1]);
-    if (last.distanceTo(latlng) < 0.1) return; // skip if under 10cm apart
+    if (last.distanceTo(latlng) < metersPerPixel() * 2) return;
   }
   points.push([lat, lng]);
   polyline.setLatLngs(points);
@@ -619,6 +625,17 @@ function clearLoaded() {
   loadedLabel.textContent = '';
 }
 
+function pathLength(latlngs) {
+  let total = 0;
+  for (let i = 1; i < latlngs.length; i++)
+    total += L.latLng(latlngs[i-1]).distanceTo(L.latLng(latlngs[i]));
+  return total;
+}
+
+function fmtDist(m) {
+  return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m';
+}
+
 async function loadFile(name) {
   clearLoaded();
   filePanel.classList.remove('open');
@@ -633,7 +650,8 @@ async function loadFile(name) {
       loadedMarkers.push(m);
     });
     map.fitBounds(loadedPolyline.getBounds(), {padding:[24,24]});
-    loadedLabel.textContent = name + ' (' + latlngs.length + ' pts)';
+    const dist = pathLength(latlngs);
+    loadedLabel.textContent = name + ' (' + latlngs.length + ' pts, ' + fmtDist(dist) + ')';
     loadedLabel.style.display = 'inline';
   } catch(e) {
     alert('Failed to load ' + name + ': ' + e.message);
