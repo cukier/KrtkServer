@@ -59,8 +59,8 @@ void HttpServer::onNewConnection() {
 }
 
 bool HttpServer::isValidFileName(const QString &name) {
-  if (name.isEmpty() || name == "." || name == ".." ||
-      name.contains('/') || name.contains('\\') || name.contains('\0'))
+  if (name.isEmpty() || name == "." || name == ".." || name.contains('/') ||
+      name.contains('\\') || name.contains('\0'))
     return false;
   for (const QChar &c : name)
     if (!c.isLetterOrNumber() && c != '_' && c != '-' && c != '.')
@@ -68,15 +68,17 @@ bool HttpServer::isValidFileName(const QString &name) {
   return true;
 }
 
-QString HttpServer::resolveFilePath(const QMap<QByteArray, QByteArray> &params) const {
-  QString name = params.contains("file") ? QString::fromUtf8(params["file"]) : m_file;
+QString
+HttpServer::resolveFilePath(const QMap<QByteArray, QByteArray> &params) const {
+  QString name =
+      params.contains("file") ? QString::fromUtf8(params["file"]) : m_file;
   if (!isValidFileName(name))
     return QString();
   return m_storagePath + "/" + name;
 }
 
 QList<QGeoCoordinate> HttpServer::readCoordinates(const QString &filePath,
-                                                   QString &error) const {
+                                                  QString &error) const {
   QFile file(filePath);
   if (!file.exists()) {
     error = "file not found";
@@ -338,7 +340,8 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
         QString err;
         QList<QGeoCoordinate> coords = getCoords(err);
         if (!err.isEmpty()) {
-          response = buildResponse(404, ("{\"error\":\"" + err + "\"}\n").toUtf8());
+          response =
+              buildResponse(404, ("{\"error\":\"" + err + "\"}\n").toUtf8());
         } else {
           int total = coords.size();
           int offset = (page - 1) * size;
@@ -350,7 +353,8 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
           } else {
             int end = qMin(offset + size, total);
             int count = qMax(0, end - offset);
-            json += ",\"count\":" + QByteArray::number(count) + ",\"coordinates\":[";
+            json += ",\"count\":" + QByteArray::number(count) +
+                    ",\"coordinates\":[";
             for (int i = offset; i < end; ++i) {
               const QGeoCoordinate &c = coords[i];
               if (i > offset)
@@ -374,17 +378,20 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
     } else {
       QString fp = resolveFilePath(params);
       if (fp.isEmpty()) {
-        response = buildResponse(400, "{\"error\":\"missing or invalid file parameter\"}\n");
+        response = buildResponse(
+            400, "{\"error\":\"missing or invalid file parameter\"}\n");
       } else {
         QString error;
         if (!appendGpsPoints(body, fp, error)) {
-          response = buildResponse(400, ("{\"error\":\"" + error + "\"}\n").toUtf8());
+          response =
+              buildResponse(400, ("{\"error\":\"" + error + "\"}\n").toUtf8());
         } else {
           if (params.contains("file"))
             m_file = QString::fromUtf8(params["file"]);
           int rows = body.count('\n');
-          response = buildResponse(200, "{\"status\":\"ok\",\"rows_received\":" +
-                                            QByteArray::number(rows) + "}\n");
+          response =
+              buildResponse(200, "{\"status\":\"ok\",\"rows_received\":" +
+                                     QByteArray::number(rows) + "}\n");
         }
       }
     }
@@ -392,27 +399,32 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
   } else if (method == "POST" && path == "/save") {
     QString fp = resolveFilePath(params);
     if (fp.isEmpty()) {
-      response = buildResponse(400, "{\"error\":\"missing or invalid file parameter\"}\n");
+      response = buildResponse(
+          400, "{\"error\":\"missing or invalid file parameter\"}\n");
     } else {
       QString error;
       if (!saveToFile(fp, error)) {
-        response = buildResponse(500, ("{\"error\":\"" + error + "\"}\n").toUtf8());
+        response =
+            buildResponse(500, ("{\"error\":\"" + error + "\"}\n").toUtf8());
       } else {
-        response = buildResponse(200, "{\"status\":\"ok\",\"saved\":" +
-                                          QByteArray::number(m_path.path().size()) + "}\n");
+        response = buildResponse(
+            200, "{\"status\":\"ok\",\"saved\":" +
+                     QByteArray::number(m_path.path().size()) + "}\n");
       }
     }
 
   } else if (method == "DELETE" && path == "/delete") {
     QString fp = resolveFilePath(params);
     if (fp.isEmpty()) {
-      response = buildResponse(400, "{\"error\":\"missing or invalid file parameter\"}\n");
+      response = buildResponse(
+          400, "{\"error\":\"missing or invalid file parameter\"}\n");
     } else if (!QFile::exists(fp)) {
       response = buildResponse(404, "{\"error\":\"file not found\"}\n");
     } else if (!QFile::remove(fp)) {
       response = buildResponse(500, "{\"error\":\"failed to delete file\"}\n");
     } else {
-      QString name = params.contains("file") ? QString::fromUtf8(params["file"]) : m_file;
+      QString name =
+          params.contains("file") ? QString::fromUtf8(params["file"]) : m_file;
       if (name == m_file)
         m_file.clear();
       response = buildResponse(200, "{\"status\":\"ok\"}\n");
@@ -465,7 +477,7 @@ button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;
   <button id="btnDraw">Draw</button>
   <button id="btnClear">Clear</button>
   <button id="btnDownload" disabled>Download CSV</button>
-  <button id="btnUpload" disabled>Upload</button>
+  <button id="btnUpload" disabled>Save</button>
   <button id="btnLoad">Load</button>
   <span id="count">0 points</span>
   <span id="loadedLabel"></span>
@@ -684,7 +696,7 @@ filePanelClose.addEventListener('click', () => filePanel.classList.remove('open'
 }
 
 QByteArray HttpServer::buildResponse(int status, const QByteArray &body,
-                                      const QByteArray &contentType) {
+                                     const QByteArray &contentType) {
   QByteArray statusText = (status == 200)   ? "OK"
                           : (status == 400) ? "Bad Request"
                           : (status == 404) ? "Not Found"
@@ -696,9 +708,10 @@ QByteArray HttpServer::buildResponse(int status, const QByteArray &body,
          "\r\nConnection: close\r\n\r\n" + body;
 }
 
-// Expected CSV: latitude,longitude[,altitude] — header rows (non-numeric) are skipped
+// Expected CSV: latitude,longitude[,altitude] — header rows (non-numeric) are
+// skipped
 bool HttpServer::appendGpsPoints(const QByteArray &csvData,
-                                  const QString &filePath, QString &error) {
+                                 const QString &filePath, QString &error) {
   QFile file(filePath);
   if (!file.open(QIODevice::Append)) {
     error = "Cannot open storage file: " + file.errorString();
