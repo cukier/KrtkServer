@@ -417,10 +417,11 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Draw Path</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;display:flex;flex-direction:column;height:100vh}
-#toolbar{display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0}
+#toolbar{display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;flex-wrap:wrap}
 #toolbar h1{font-size:.9rem;font-weight:600;color:#f0f6fc;margin-right:.4rem}
 button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;border:1px solid #30363d;cursor:pointer;transition:background .15s}
 #btnDraw{background:#0c1f3f;color:#58a6ff;border-color:#1f6feb}
@@ -428,8 +429,25 @@ button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;
 #btnClear{background:#2d0f0f;color:#f85149;border-color:#6e1a1a}
 #btnDownload{background:#0d2b1a;color:#3fb950;border-color:#238636}
 #btnDownload:disabled{opacity:.4;cursor:not-allowed}
+#btnUpload{background:#1f2a1f;color:#56d364;border-color:#2ea043}
+#btnUpload:disabled{opacity:.4;cursor:not-allowed}
+#btnLoad{background:#1a1a2e;color:#d2a8ff;border-color:#6e40c9}
 #count{font-size:.75rem;color:#8b949e;margin-left:.25rem}
-#map{flex:1}
+#map{flex:1;position:relative}
+#filePanel{position:absolute;top:.75rem;right:.75rem;z-index:1000;background:#161b22;border:1px solid #30363d;border-radius:8px;min-width:200px;max-width:280px;box-shadow:0 4px 16px #0008;display:none}
+#filePanel.open{display:block}
+#filePanelHeader{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-bottom:1px solid #21262d}
+#filePanelHeader span{font-size:.8rem;font-weight:600;color:#f0f6fc}
+#filePanelClose{background:none;border:none;color:#8b949e;font-size:1rem;cursor:pointer;padding:0 .1rem;line-height:1}
+#filePanelClose:hover{color:#f85149}
+#fileList{max-height:260px;overflow-y:auto;padding:.35rem 0}
+.file-item{display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;cursor:pointer;gap:.5rem;transition:background .12s}
+.file-item:hover{background:#21262d}
+.file-name{font-size:.78rem;font-family:'SF Mono',Consolas,monospace;color:#79c0ff;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-show{font-size:.68rem;font-weight:600;color:#3fb950;background:#0d2b1a;border:1px solid #238636;border-radius:4px;padding:.15rem .4rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.file-show:hover{background:#238636;color:#fff}
+#fileEmpty{font-size:.78rem;color:#6e7681;padding:.6rem .75rem;text-align:center}
+#loadedLabel{font-size:.75rem;color:#d2a8ff;margin-left:.1rem;display:none}
 </style>
 </head>
 <body>
@@ -438,9 +456,20 @@ button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;
   <button id="btnDraw">Draw</button>
   <button id="btnClear">Clear</button>
   <button id="btnDownload" disabled>Download CSV</button>
+  <button id="btnUpload" disabled>Upload</button>
+  <button id="btnLoad">Load</button>
   <span id="count">0 points</span>
+  <span id="loadedLabel"></span>
 </div>
-<div id="map"></div>
+<div id="map">
+  <div id="filePanel">
+    <div id="filePanelHeader">
+      <span>Saved files</span>
+      <button id="filePanelClose">&#x2715;</button>
+    </div>
+    <div id="fileList"><div id="fileEmpty">Loading…</div></div>
+  </div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const map = L.map('map').setView([0, 0], 2);
@@ -453,14 +482,25 @@ let points = [];
 let polyline = L.polyline([], {color:'#58a6ff',weight:3}).addTo(map);
 let markers = [];
 
+let loadedPolyline = L.polyline([], {color:'#d2a8ff',weight:3,dashArray:'6 4'}).addTo(map);
+let loadedMarkers = [];
+
 const btnDraw = document.getElementById('btnDraw');
 const btnClear = document.getElementById('btnClear');
 const btnDownload = document.getElementById('btnDownload');
+const btnUpload = document.getElementById('btnUpload');
+const btnLoad = document.getElementById('btnLoad');
 const countEl = document.getElementById('count');
+const loadedLabel = document.getElementById('loadedLabel');
+const filePanel = document.getElementById('filePanel');
+const fileList = document.getElementById('fileList');
+const fileEmpty = document.getElementById('fileEmpty');
+const filePanelClose = document.getElementById('filePanelClose');
 
 function updateCount() {
   countEl.textContent = points.length + ' point' + (points.length !== 1 ? 's' : '');
   btnDownload.disabled = points.length === 0;
+  btnUpload.disabled = points.length === 0;
 }
 
 btnDraw.addEventListener('click', () => {
@@ -505,6 +545,100 @@ btnDownload.addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+
+btnUpload.addEventListener('click', async () => {
+  if (points.length === 0) return;
+  const name = prompt('Save as filename (e.g. mypath.csv):');
+  if (!name || !name.trim()) return;
+  const csv = points.map(p => p[0].toFixed(7) + ',' + p[1].toFixed(7)).join('\n');
+  try {
+    const res = await fetch('/upload?file=' + encodeURIComponent(name.trim()), {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: csv
+    });
+    const json = await res.json();
+    if (res.ok) {
+      alert('Uploaded ' + points.length + ' points as "' + name.trim() + '".');
+    } else {
+      alert('Upload failed: ' + (json.error || res.status));
+    }
+  } catch(e) {
+    alert('Upload error: ' + e.message);
+  }
+});
+
+function clearLoaded() {
+  loadedPolyline.setLatLngs([]);
+  loadedMarkers.forEach(m => map.removeLayer(m));
+  loadedMarkers = [];
+  loadedLabel.style.display = 'none';
+  loadedLabel.textContent = '';
+}
+
+async function loadFile(name) {
+  clearLoaded();
+  filePanel.classList.remove('open');
+  try {
+    const res = await fetch('/download?file=' + encodeURIComponent(name));
+    const json = await res.json();
+    if (!json.path || json.path.length === 0) { alert('No coordinates in ' + name); return; }
+    const latlngs = json.path.map(p => [p.lat, p.lon]);
+    loadedPolyline.setLatLngs(latlngs);
+    latlngs.forEach(ll => {
+      const m = L.circleMarker(ll, {radius:3,color:'#d2a8ff',fillColor:'#d2a8ff',fillOpacity:0.8,weight:1}).addTo(map);
+      loadedMarkers.push(m);
+    });
+    map.fitBounds(loadedPolyline.getBounds(), {padding:[24,24]});
+    loadedLabel.textContent = name + ' (' + latlngs.length + ' pts)';
+    loadedLabel.style.display = 'inline';
+  } catch(e) {
+    alert('Failed to load ' + name + ': ' + e.message);
+  }
+}
+
+btnLoad.addEventListener('click', async () => {
+  if (filePanel.classList.contains('open')) {
+    filePanel.classList.remove('open');
+    return;
+  }
+  fileEmpty.textContent = 'Loading…';
+  fileList.innerHTML = '';
+  fileList.appendChild(fileEmpty);
+  filePanel.classList.add('open');
+  try {
+    const res = await fetch('/files');
+    const json = await res.json();
+    fileList.innerHTML = '';
+    if (!json.files || json.files.length === 0) {
+      fileEmpty.textContent = 'No saved files found.';
+      fileList.appendChild(fileEmpty);
+      return;
+    }
+    json.files.forEach(name => {
+      const row = document.createElement('div');
+      row.className = 'file-item';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'file-name';
+      nameEl.textContent = name;
+      nameEl.title = name;
+      const showBtn = document.createElement('button');
+      showBtn.className = 'file-show';
+      showBtn.textContent = 'Show';
+      showBtn.addEventListener('click', e => { e.stopPropagation(); loadFile(name); });
+      row.appendChild(nameEl);
+      row.appendChild(showBtn);
+      row.addEventListener('click', () => loadFile(name));
+      fileList.appendChild(row);
+    });
+  } catch(e) {
+    fileEmpty.textContent = 'Error: ' + e.message;
+    fileList.innerHTML = '';
+    fileList.appendChild(fileEmpty);
+  }
+});
+
+filePanelClose.addEventListener('click', () => filePanel.classList.remove('open'));
 </script>
 </body>
 </html>)html";
