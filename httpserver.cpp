@@ -262,6 +262,10 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
 </div>
 
 <div class="card">
+  <div class="row"><span class="badge GET">GET</span><span class="path">/view</span><span class="desc">Interactive Leaflet map — draw a path and download as CSV</span></div>
+</div>
+
+<div class="card">
   <div class="row"><span class="badge GET">GET</span><span class="path">/help</span><span class="desc">This page</span></div>
 </div>
 
@@ -404,6 +408,107 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
         m_file.clear();
       response = buildResponse(200, "{\"status\":\"ok\"}\n");
     }
+
+  } else if (method == "GET" && path == "/view") {
+    static const QByteArray viewHtml = R"html(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draw Path</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;display:flex;flex-direction:column;height:100vh}
+#toolbar{display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0}
+#toolbar h1{font-size:.9rem;font-weight:600;color:#f0f6fc;margin-right:.4rem}
+button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;border:1px solid #30363d;cursor:pointer;transition:background .15s}
+#btnDraw{background:#0c1f3f;color:#58a6ff;border-color:#1f6feb}
+#btnDraw.active{background:#1f6feb;color:#fff}
+#btnClear{background:#2d0f0f;color:#f85149;border-color:#6e1a1a}
+#btnDownload{background:#0d2b1a;color:#3fb950;border-color:#238636}
+#btnDownload:disabled{opacity:.4;cursor:not-allowed}
+#count{font-size:.75rem;color:#8b949e;margin-left:.25rem}
+#map{flex:1}
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>Draw Path</h1>
+  <button id="btnDraw">Draw</button>
+  <button id="btnClear">Clear</button>
+  <button id="btnDownload" disabled>Download CSV</button>
+  <span id="count">0 points</span>
+</div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([0, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+}).addTo(map);
+
+let drawing = false;
+let points = [];
+let polyline = L.polyline([], {color:'#58a6ff',weight:3}).addTo(map);
+let markers = [];
+
+const btnDraw = document.getElementById('btnDraw');
+const btnClear = document.getElementById('btnClear');
+const btnDownload = document.getElementById('btnDownload');
+const countEl = document.getElementById('count');
+
+function updateCount() {
+  countEl.textContent = points.length + ' point' + (points.length !== 1 ? 's' : '');
+  btnDownload.disabled = points.length === 0;
+}
+
+btnDraw.addEventListener('click', () => {
+  drawing = !drawing;
+  btnDraw.classList.toggle('active', drawing);
+  btnDraw.textContent = drawing ? 'Stop' : 'Draw';
+  map.getContainer().style.cursor = drawing ? 'crosshair' : '';
+});
+
+map.on('click', e => {
+  if (!drawing) return;
+  const {lat, lng} = e.latlng;
+  points.push([lat, lng]);
+  polyline.setLatLngs(points);
+  const m = L.circleMarker([lat, lng], {radius:4,color:'#f0f6fc',fillColor:'#58a6ff',fillOpacity:1,weight:1}).addTo(map);
+  markers.push(m);
+  updateCount();
+});
+
+btnClear.addEventListener('click', () => {
+  points = [];
+  polyline.setLatLngs([]);
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  updateCount();
+  if (drawing) {
+    drawing = false;
+    btnDraw.classList.remove('active');
+    btnDraw.textContent = 'Draw';
+    map.getContainer().style.cursor = '';
+  }
+});
+
+btnDownload.addEventListener('click', () => {
+  if (points.length === 0) return;
+  const csv = 'latitude,longitude\n' + points.map(p => p[0].toFixed(7) + ',' + p[1].toFixed(7)).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'path.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>)html";
+    response = buildResponse(200, viewHtml, "text/html");
 
   } else {
     response = buildResponse(404, "{\"error\":\"not found\"}\n");
