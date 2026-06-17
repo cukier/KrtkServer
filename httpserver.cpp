@@ -473,7 +473,7 @@ button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
 <script>
-const map = L.map('map').setView([0, 0], 2);
+const map = L.map('map').setView([-22.999118, -47.044591], 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
 }).addTo(map);
@@ -485,7 +485,6 @@ L.Control.geocoder({defaultMarkGeocode: false, placeholder: 'Search place…'})
 let drawing = false;
 let points = [];
 let polyline = L.polyline([], {color:'#58a6ff',weight:3}).addTo(map);
-let markers = [];
 
 let loadedPolyline = L.polyline([], {color:'#d2a8ff',weight:3,dashArray:'6 4'}).addTo(map);
 let loadedMarkers = [];
@@ -508,34 +507,52 @@ function updateCount() {
   btnUpload.disabled = points.length === 0;
 }
 
+let pressing = false;
+
+function addPoint(latlng) {
+  const {lat, lng} = latlng;
+  if (points.length > 0) {
+    const last = L.latLng(points[points.length - 1]);
+    if (last.distanceTo(latlng) < 0.1) return; // skip if under 10cm apart
+  }
+  points.push([lat, lng]);
+  polyline.setLatLngs(points);
+  updateCount();
+}
+
 btnDraw.addEventListener('click', () => {
   drawing = !drawing;
   btnDraw.classList.toggle('active', drawing);
   btnDraw.textContent = drawing ? 'Stop' : 'Draw';
   map.getContainer().style.cursor = drawing ? 'crosshair' : '';
+  if (drawing) map.dragging.disable();
+  else { map.dragging.enable(); pressing = false; }
 });
 
-map.on('click', e => {
-  if (!drawing) return;
-  const {lat, lng} = e.latlng;
-  points.push([lat, lng]);
-  polyline.setLatLngs(points);
-  const m = L.circleMarker([lat, lng], {radius:4,color:'#f0f6fc',fillColor:'#58a6ff',fillOpacity:1,weight:1}).addTo(map);
-  markers.push(m);
-  updateCount();
+map.on('mousedown', e => {
+  if (!drawing || e.originalEvent.button !== 0) return;
+  pressing = true;
+  addPoint(e.latlng);
 });
+
+map.on('mousemove', e => {
+  if (!drawing || !pressing) return;
+  addPoint(e.latlng);
+});
+
+document.addEventListener('mouseup', () => { pressing = false; });
 
 btnClear.addEventListener('click', () => {
   points = [];
   polyline.setLatLngs([]);
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
   updateCount();
   if (drawing) {
     drawing = false;
+    pressing = false;
     btnDraw.classList.remove('active');
     btnDraw.textContent = 'Draw';
     map.getContainer().style.cursor = '';
+    map.dragging.enable();
   }
 });
 
