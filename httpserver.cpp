@@ -267,11 +267,11 @@ td:first-child{font-family:'SF Mono',Consolas,monospace;color:#79c0ff;white-spac
   <div class="row"><span class="badge GET">GET</span><span class="path">/view</span><span class="desc">Interactive map — freehand draw, upload, load &amp; download paths</span></div>
   <div class="params"><table>
     <tr><th colspan="3" class="note" style="font-style:normal;font-weight:500;color:#c9d1d9">Toolbar actions</th></tr>
-    <tr><td>Draw / Stop</td><td></td><td>Toggle freehand mode — hold left button and drag to record. Points &lt;10 cm apart are skipped. Map pan is disabled while drawing.</td></tr>
+    <tr><td>Draw / Stop</td><td></td><td>Toggle freehand mode — hold left button and drag to record. Points closer than ~2 pixels of real-world distance are skipped (threshold scales with zoom). Resolution is limited by map tile zoom: ~30 cm/px at OSM max zoom 19. For sub-cm precision, upload real GPS data via <code>/upload</code>.</td></tr>
     <tr><td>Clear</td><td></td><td>Remove all drawn points from the map</td></tr>
     <tr><td>Download CSV</td><td></td><td>Save the drawn path as <code>path.csv</code> (browser download, no server call)</td></tr>
-    <tr><td>Upload</td><td></td><td>POST the drawn path to <code>/upload</code> under a chosen filename</td></tr>
-    <tr><td>Load</td><td></td><td>Open file panel — lists all server files; click a row or Show to display its path in purple on the map</td></tr>
+    <tr><td>Save</td><td></td><td>POST the drawn path to <code>/upload</code> under a chosen filename</td></tr>
+    <tr><td>Load</td><td></td><td>Open file panel — lists all server files; click a row or Show to display its path in purple on the map. Label shows point count and total path length.</td></tr>
     <tr><td colspan="3" class="note">Search box (top-right of map) — geocodes place names via Nominatim (OpenStreetMap), no API key required</td></tr>
   </table></div>
 </div>
@@ -562,9 +562,10 @@ map.on('mousedown', e => {
   addPoint(e.latlng);
 });
 
-map.on('mousemove', e => {
+map.getContainer().addEventListener('mousemove', e => {
   if (!drawing || !pressing) return;
-  addPoint(e.latlng);
+  const rect = map.getContainer().getBoundingClientRect();
+  addPoint(map.containerPointToLatLng(L.point(e.clientX - rect.left, e.clientY - rect.top)));
 });
 
 document.addEventListener('mouseup', () => { pressing = false; });
