@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QFile>
 #include <QGeoCoordinate>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QTcpSocket>
 
 HttpServer::HttpServer(const QString &storagePath, quint16 port,
@@ -129,16 +131,14 @@ void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
         } else {
           int end = qMin(offset + size, total);
           int count = qMax(0, end - offset);
-          json += ",\"count\":" + QByteArray::number(count) +
-                  ",\"coordinates\":[";
+          json +=
+              ",\"count\":" + QByteArray::number(count) + ",\"coordinates\":[";
           for (int i = offset; i < end; ++i) {
             const QGeoCoordinate &c = coords[i];
             if (i > offset)
               json += ",";
-            json += "{\"lat\":" +
-                    QByteArray::number(c.latitude(), 'f', 7) +
-                    ",\"lon\":" +
-                    QByteArray::number(c.longitude(), 'f', 7);
+            json += "{\"lat\":" + QByteArray::number(c.latitude(), 'f', 7) +
+                    ",\"lon\":" + QByteArray::number(c.longitude(), 'f', 7);
             if (c.type() == QGeoCoordinate::Coordinate3D)
               json += ",\"alt\":" + QByteArray::number(c.altitude(), 'f', 2);
             json += "}";
@@ -148,7 +148,6 @@ void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
         response = buildResponse(200, json);
       }
     }
-
   } else if (method == "POST" && path == "/upload") {
     if (body.isEmpty()) {
       response = buildResponse(400, "{\"error\":\"empty body\"}\n");
@@ -164,7 +163,24 @@ void HttpServer::handleClient(QTcpSocket *socket, const QByteArray &data) {
         response = buildResponse(200, msg);
       }
     }
+  } else if (method == "GET" && path == "/path") {
+    if (m_path.length() > 0) {
+      QVariantList pathList;
 
+      for (const QGeoCoordinate &coord : m_path.path()) {
+        QVariantMap coordMap;
+        coordMap["latitude"] = coord.latitude();
+        coordMap["longitude"] = coord.longitude();
+        pathList.append(coordMap);
+      }
+
+      QJsonDocument jsonDoc(QJsonArray::fromVariantList(pathList));
+      QByteArray jsonString = jsonDoc.toJson(QJsonDocument::Compact);
+      QByteArray json = "{\"path\":" + jsonString + "}";
+      response = buildResponse(200, json);
+    } else {
+      response = buildResponse(404, "{\"error\":\"no path found\"}\n");
+    }
   } else {
     response = buildResponse(404, "{\"error\":\"not found\"}\n");
   }
