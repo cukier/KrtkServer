@@ -471,11 +471,19 @@ button{font-size:.78rem;font-weight:600;padding:.32rem .75rem;border-radius:5px;
   </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
 <script>
 const map = L.map('map').setView([0, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
 }).addTo(map);
+
+L.Control.geocoder({defaultMarkGeocode: false, placeholder: 'Search place…'})
+  .on('markgeocode', e => { map.fitBounds(e.geocode.bbox, {padding:[24,24]}); })
+  .addTo(map);
+
+map.locate({setView: true, maxZoom: 16});
+map.on('locationerror', () => map.setView([0, 0], 2));
 
 let drawing = false;
 let points = [];
